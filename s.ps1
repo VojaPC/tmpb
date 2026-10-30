@@ -1,7 +1,10 @@
-$ip='87.250.60.120'
-Get-NetFirewallRule -DisplayName 'Dell-PG-6023' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName 'Dell-PG-6023' -Direction Inbound -Protocol TCP -LocalPort 6023 -RemoteAddress $ip -Action Allow | Out-Null
-Get-NetTCPConnection -LocalPort 6023 -State Listen -ErrorAction SilentlyContinue | % { "LISTEN " + $_.LocalAddress + ":" + $_.LocalPort }
-Get-NetFirewallRule -DisplayName 'Dell-PG-6023' | Get-NetFirewallAddressFilter | % { "rule remote=" + $_.RemoteAddress }
-Get-NetFirewallProfile | % { $_.Name + ' enabled=' + $_.Enabled }
-Write-Host "DONE"
+$d='C:\Program Files\PostgreSQL\17\data'
+Write-Host "--- conf"
+Select-String -Path "$d\postgresql.conf" -Pattern '^\s*(port|listen_addresses)\s*=' | % { $_.Line.Trim() }
+Write-Host "--- pg listen"
+Get-NetTCPConnection -State Listen | ? { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -like 'postgres*' } | % { "PG LISTEN " + $_.LocalAddress + ":" + $_.LocalPort }
+Write-Host "--- hba"
+Select-String -Path "$d\pg_hba.conf" -Pattern '^\s*host' | % { $_.Line.Trim() }
+Write-Host "--- fw rules for 6023/5432"
+Get-NetFirewallRule -Direction Inbound -Action Allow | ? { $_.Enabled -eq 'True' -and (($_ | Get-NetFirewallPortFilter).LocalPort -match '6023|5432') } | % { $_.DisplayName + ' remote=' + (($_ | Get-NetFirewallAddressFilter).RemoteAddress -join ',') }
+Write-Host "DONE2"
